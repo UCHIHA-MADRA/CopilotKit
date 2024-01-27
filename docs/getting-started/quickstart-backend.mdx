@@ -1,0 +1,89 @@
+---
+title: "Quickstart: Backend"
+description: "How to setup the CopilotBackend endpoints"
+---
+
+## Setup
+
+### Setup the CopilotKit Backend Endpoint:
+
+Currently all you require is an endpoint which serves as a proxy to an OpenAI-like LLM endpoint.
+See below for examples using NextJS edge functions / Flask.
+
+#### Manually specified endpoint: nodeJS (typescript)
+
+Make sure to install the `openai` package (or use any openai-compatible LLM provider):
+
+<CodeGroup>
+  ```bash npm npm i openai ``` ```bash yarn yarn add openai ``` ```bash pnpm
+  pnpm add openai ```
+</CodeGroup>
+
+Remember to add any required environment variables. E.g. to use OpenAI:
+
+```env .env.local
+OPENAI_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+```ts /api/copilotkit/openai/route.ts (NextJS)
+import { CopilotBackend, OpenAIAdapter } from "@copilotkit/backend";
+
+export const runtime = "edge";
+
+export async function POST(req: Request): Promise<Response> {
+  const copilotKit = new CopilotBackend();
+
+  return copilotKit.response(req, new OpenAIAdapter());
+}
+```
+
+#### Manually specified endpoint: flask (python)
+
+Make sure to install the `Flask` and `openai` packages.
+
+```python
+from flask import Flask, request, Response
+from flask import Response
+import openai
+
+app = Flask(__name__)
+
+# Assuming the API key is set in environment variables
+client = openai.OpenAI(
+    api_key="" # add your api key here
+)
+
+def generate_stream(**forwarded_props):
+    """
+    Generator function to stream the chat completion response.
+    """
+    # Ensure streaming is enabled
+    forwarded_props['stream'] = True
+    forwarded_props['model'] = "gpt-4-1106-preview"
+
+    response_stream = client.chat.completions.create(**forwarded_props)
+
+    for response in response_stream:
+        text = response.choices[0].delta.content or ""
+        if text:
+            yield text
+
+
+@app.route('/copilotkit_endpoint', methods=['POST'])
+def copilotkit_endpoint():
+    """
+    Endpoint to handle chat requests and stream responses.
+    """
+
+    # Extracting all properties from the request JSON
+    forwarded_props = request.get_json(force=True)
+
+    # Generate and return the streaming response
+    return Response(
+        generate_stream(**forwarded_props),
+        content_type='text/plain; charset=utf-8',
+        headers={
+            'Access-Control-Allow-Origin': '*',
+        }
+    )
+```
